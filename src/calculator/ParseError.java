@@ -1,7 +1,7 @@
 package calculator;
 
 public class ParseError extends Exception {
-    public ParseError() {
-        super("Wrong input");
+    public ParseError(ParseErrorInput e) {
+        super("In "+e.function()+": Wrong input; lookahead is: "+ e.lookahead());
     }
 }

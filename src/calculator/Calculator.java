@@ -6,64 +6,57 @@ import java.io.InputStream;
 public class Calculator {
     private final InputStream in;
     private int lookahead; // current parsed token
+    private Exp2Res exp2Res;
 
     public Calculator() throws IOException {
         this.in = System.in;
         lookahead = in.read();
+        exp2Res = new Exp2Res('+', 0);
     }
 
-    private int exp() throws IOException, ParseError {
+    private int exp() throws IOException, ParseError, OperError {
         if (isDigit(lookahead)) {
-            int num = evalDigit(lookahead);
+            int right = evalDigit(lookahead);
+            int new_left = doCalc(exp2Res.num, exp2Res.oper, right);
             consume(lookahead);
-            Exp2Res exp2Res = exp2();
-            if (exp2Res == null)
-                return num;
+            return exp2(new_left);
 
-            int result = 0;
-//            System.out.printf("lookahead is: %c, %n", lookahead);
-//            System.out.printf("exp2res: oper %c, num %d\n", exp2Res.oper, exp2Res.num);
-            switch (exp2Res.oper) {
-                case ('+'):
-                    result = num + exp2Res.num;
-                case ('-'):
-                    result = num - exp2Res.num;
-                case ('*'):
-                    result = (int) Math.pow(num, exp2Res.num);
-            }
-            return result;
         }
+        else if (isEOF(lookahead))
+            return exp2Res.num;
 
-        throw new ParseError();
+        throw new ParseError(new ParseErrorInput("exp", (char)lookahead));
     }
 
-    private Exp2Res exp2() throws ParseError, IOException {
+    private int exp2(int left) throws ParseError, IOException, OperError {
         if (acceptableOp()) {
-//            System.out.println("acceptable; lookahead is:");
-//            System.out.printf("%c\n",lookahead);
-            int oper = lookahead;
-            int res = exp();
+            this.exp2Res.oper = lookahead;
             consume(lookahead);
-            return new Exp2Res(lookahead, res);
+            this.exp2Res.num = left;
+            return exp();
         }
 
-        if (lookahead == '\n' || lookahead == -1)
-            return null;
+        if (isEOF(lookahead))
+            return left;
 
-        throw new ParseError();
+        throw new OperError((char)lookahead);
     }
 
 
     // Helper functions
     private void consume(int c) throws IOException, ParseError {
         if (lookahead != c)
-            throw new ParseError();
+            throw new ParseError(new ParseErrorInput("consume", (char)lookahead));
 
         lookahead = in.read();
     }
 
     private boolean isDigit(int c) {
         return '0' <= c && c <= '9';
+    }
+
+    private boolean isEOF(int c) {
+        return c == '\n' || c == -1;
     }
 
     private int evalDigit(int c) {
@@ -81,7 +74,16 @@ public class Calculator {
         return false;
     }
 
-    public int eval() throws ParseError, IOException {
+    private int doCalc(int left, int op, int right) throws ParseError {
+        return switch (op) {
+            case ('+') -> left + right;
+            case ('-') -> left - right;
+            case ('*') -> (int) Math.pow(left, right);
+            default -> throw new ParseError(new ParseErrorInput("doCalc", (char)lookahead));
+        };
+    }
+
+    public int eval() throws ParseError, IOException, OperError {
         return exp();
     }
 }
