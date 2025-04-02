@@ -2,51 +2,94 @@ package calculator;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
 
 public class Calculator {
     private final InputStream in;
     private int lookahead; // current parsed token
-    private Exp2Res exp2Res;
 
     public Calculator() throws IOException {
         this.in = System.in;
         lookahead = in.read();
-        exp2Res = new Exp2Res('+', 0);
     }
 
     private int exp() throws IOException, ParseError, OperError {
-        if (isDigit(lookahead)) {
-            int right = evalDigit(lookahead);
-            int new_left = doCalc(exp2Res.num, exp2Res.oper, right);
-            consume(lookahead);
-            return exp2(new_left);
+        if (!isDigit(lookahead) && lookahead != '(')
+            throw new ParseError(new ParseErrorInput("exp", (char) lookahead));
 
-        }
-        else if (isEOF(lookahead))
-            return exp2Res.num;
-
-        throw new ParseError(new ParseErrorInput("exp", (char)lookahead));
+        return exp2(term());
     }
 
     private int exp2(int left) throws ParseError, IOException, OperError {
-        if (acceptableOp()) {
-            this.exp2Res.oper = lookahead;
+        if (lookahead == '+' || lookahead == '-') {
+            int oper = lookahead;
             consume(lookahead);
-            this.exp2Res.num = left;
-            return exp();
+            int right = term();
+            return exp2(doCalc(left, oper, right));
         }
 
-        if (isEOF(lookahead))
+        if (isEOF(lookahead) || lookahead == ')')
             return left;
 
-        throw new OperError((char)lookahead);
+        throw new OperError((char) lookahead);
+    }
+
+    private int term() throws ParseError, IOException, OperError {
+        if (!isDigit(lookahead) && lookahead != '(')
+            throw new ParseError(new ParseErrorInput("term", (char) lookahead));
+
+        return term2(factor());
+    }
+
+    private int term2(int left) throws ParseError, IOException, OperError {
+        if (isExp()) {
+            //  ** factor term2()
+            int res = doCalc(left, '*', factor());
+            return term2(res);
+        }
+
+        if (lookahead == '+' || lookahead == '-' || lookahead == ')' || isEOF(lookahead))
+            return left;
+
+        throw new OperError((char) lookahead);
+    }
+
+    private int factor() throws ParseError, IOException, OperError {
+        if (isDigit(lookahead))
+            return num();
+        if (lookahead == '(') {
+            consume('(');
+            int _exp = exp();
+            consume(')');
+            return _exp;
+        }
+
+        throw new ParseError(new ParseErrorInput("factor", (char) lookahead));
+    }
+
+    private int num() throws ParseError, IOException {
+        ArrayList<Integer> digits = new ArrayList<>();
+        do {
+            digits.add(lookahead);
+            consume(lookahead);
+        } while (isDigit(lookahead));
+
+        int exp = 1;
+        int number = 0;
+        for (int i = digits.size() - 1; i >= 0; i--) {
+            number += evalDigit(digits.get(i)) * exp;
+            exp *= 10;
+        }
+
+        return number;
     }
 
 
     // Helper functions
     private void consume(int c) throws IOException, ParseError {
+//        System.out.println("Consuming " + (char) lookahead);
         if (lookahead != c)
-            throw new ParseError(new ParseErrorInput("consume", (char)lookahead));
+            throw new ParseError(new ParseErrorInput("consume", (char) lookahead));
 
         lookahead = in.read();
     }
@@ -63,12 +106,12 @@ public class Calculator {
         return c - '0';
     }
 
-    private boolean acceptableOp() throws ParseError, IOException {
-        if (lookahead == '+' || lookahead == '-')
-            return true;
+    private boolean isExp() throws ParseError, IOException {
         if (lookahead == '*') {
             consume('*');
-            return lookahead == '*';
+            consume('*');
+            //  if no issues arose from consuming two '*', then we have exponentiation
+            return true;
         }
 
         return false;
@@ -79,7 +122,7 @@ public class Calculator {
             case ('+') -> left + right;
             case ('-') -> left - right;
             case ('*') -> (int) Math.pow(left, right);
-            default -> throw new ParseError(new ParseErrorInput("doCalc", (char)lookahead));
+            default -> throw new ParseError(new ParseErrorInput("doCalc", (char) lookahead));
         };
     }
 
