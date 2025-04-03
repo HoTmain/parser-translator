@@ -4,7 +4,7 @@
     r4:      | ε
 
     r5: term  -> factor term2
-    r6: term2 -> **factor term2
+    r6: term2 -> ** term
     r7:        | ε
 
     r8: factor -> num

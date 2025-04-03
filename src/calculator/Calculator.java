@@ -38,15 +38,13 @@ public class Calculator {
         if (!isDigit(lookahead) && lookahead != '(')
             throw new ParseError(new ParseErrorInput("term", (char) lookahead));
 
-        return term2();
+        return term2(factor());
     }
 
-    private int term2() throws ParseError, IOException, OperError {
-        int left = factor();
+    private int term2(int left) throws ParseError, IOException, OperError {
         if (isExp()) {
-            //  term2() ** factor
-            int right = term2();
-            return doCalc(left, '*', right);
+            //  ** term()
+            return doCalc(left, '*', term());
         }
 
         if (lookahead == '+' || lookahead == '-' || lookahead == ')' || isEOF(lookahead))
